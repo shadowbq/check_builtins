@@ -134,8 +134,8 @@ EOF
     # Create a test whitelist config
     cat > .check_builtins << 'EOF'
 # Test whitelist configuration
-whitelist ls
-whitelist test_alias
+WHITELIST ls
+WHITELIST test_alias
 EOF
 }
 
@@ -227,6 +227,46 @@ test_critical_commands() {
     run_test_output "Critical commands audit" 0 "Critical commands audit:" "$SCRIPT_PATH" --all
 }
 
+test_critical_commands_config() {
+    log_info "=== Testing Critical Commands Configuration ==="
+    
+    # Create a test config file for critical commands
+    cat > test_critical_config.txt << 'EOF'
+# Test critical commands configuration
+WHITELIST ls
+CRITICAL wget
+CRITICAL curl
+NONCRITICAL echo
+EOF
+    
+    # Test that CRITICAL commands are added
+    CHECK_BUILTINS="test_critical_config.txt" run_test_output "CRITICAL adds commands" 0 "wget.*external" "$SCRIPT_PATH" --all
+    CHECK_BUILTINS="test_critical_config.txt" run_test_output "CRITICAL adds curl" 0 "curl.*external" "$SCRIPT_PATH" --all
+    
+    # Test that NONCRITICAL removes commands (echo should not appear in critical section)
+    local output
+    if output=$(CHECK_BUILTINS="test_critical_config.txt" "$SCRIPT_PATH" --all 2>&1); then
+        if echo "$output" | grep -A 20 "Critical commands audit:" | grep -q "^echo"; then
+            log_error "NONCRITICAL test failed - echo still appears in critical commands"
+            ((TESTS_FAILED++))
+        else
+            log_success "NONCRITICAL removes commands - echo not in critical list ✓"
+            ((TESTS_PASSED++))
+        fi
+    else
+        log_error "NONCRITICAL test failed - command execution failed"
+        ((TESTS_FAILED++))
+    fi
+    ((TESTS_RUN++))
+    
+    # Test debug output shows config processing
+    CHECK_BUILTINS="test_critical_config.txt" run_test_output "Critical config debug" 0 "Adding critical command: wget" "$SCRIPT_PATH" --debug echo
+    CHECK_BUILTINS="test_critical_config.txt" run_test_output "Critical config debug removal" 0 "Removing critical command: echo" "$SCRIPT_PATH" --debug echo
+    
+    # Clean up
+    rm -f test_critical_config.txt
+}
+
 test_error_conditions() {
     log_info "=== Testing Error Conditions ==="
     
@@ -253,8 +293,8 @@ test_environment_variables() {
     local temp_config="/tmp/test_check_builtins_$$"
     cat > "$temp_config" << 'EOF'
 # Test configuration from environment variable
-whitelist test_env_command
-whitelist ls
+WHITELIST test_env_command
+WHITELIST ls
 EOF
     
     # Test that the environment variable config is found and used
@@ -383,6 +423,8 @@ main() {
     echo
     test_critical_commands
     echo
+    test_critical_commands_config
+    echo
     test_error_conditions
     echo
     test_environment_variables
@@ -458,6 +500,11 @@ if [[ $# -gt 0 ]]; then
             test_critical_commands 
             cleanup_test_files
             ;;
+        critical-config) 
+            setup_test_files
+            test_critical_commands_config 
+            cleanup_test_files
+            ;;
         errors) 
             setup_test_files
             test_error_conditions 
@@ -489,7 +536,7 @@ if [[ $# -gt 0 ]]; then
             cleanup_test_files
             ;;
         *)
-            echo "Usage: $0 [help|single|all|options|aliases|whitelist|critical|errors|env|exit|performance|robustness|integration]"
+            echo "Usage: $0 [help|single|all|options|aliases|whitelist|critical|critical-config|errors|env|exit|performance|robustness|integration]"
             echo "Or run without arguments to run all tests"
             exit 1
             ;;

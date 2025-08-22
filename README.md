@@ -212,9 +212,9 @@ Create a `.check_builtins` file in the same directory as the script to whitelist
 
 ```bash
 # Comments are allowed
-whitelist ls
-whitelist grep
-whitelist find
+WHITELIST ls
+WHITELIST grep
+WHITELIST find
 ```
 
 ### Environment Variables

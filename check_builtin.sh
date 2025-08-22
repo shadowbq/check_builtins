@@ -3,7 +3,7 @@
 set -euo pipefail
 shopt -s expand_aliases
 
-VERSION="1.0.1"
+VERSION="1.1.0"
 
 # Optionally load bashrc files (to capture user aliases) unless disabled
 if [[ -z "${CHECK_BUILTINS_NO_RC:-}" ]]; then
@@ -29,8 +29,8 @@ CHECKMARK="${GREEN}✔${RESET}"
 CROSS="${RED}❌${RESET}"
 WARN="${YELLOW}⚠${RESET}"
 
-# -------- Critical commands --------
-CRITICAL=("cd" "rm" "mv" "sudo" "kill" "sh" "bash" "echo" "printf")
+# -------- Critical commands (default list, can be modified by config) --------
+# This will be initialized after config file parsing
 
 # -------- Help --------
 show_version() {
@@ -52,6 +52,11 @@ Usage:
       --alias-file <file>          # source additional alias file
   check_builtins.sh -h|--help      # show this help
   check_builtins.sh --version      # show version information
+
+Configuration file (.check_builtins):
+  WHITELIST <command>              # whitelist a command override
+  CRITICAL <command>               # add command to critical commands list
+  NONCRITICAL <command>            # remove command from critical commands list
 
 Exit codes:
   Single command mode:
@@ -137,6 +142,9 @@ find_config_file() {
 }
 
 declare -A whitelist_commands
+declare -a critical_additions=()
+declare -a critical_removals=()
+
 if config_file=$(find_config_file); then
     ${debug:-false} && builtin echo "DEBUG: Found config file: $config_file" >&2
     while IFS= read -r line; do
@@ -145,13 +153,53 @@ if config_file=$(find_config_file); then
         [[ "$line" =~ ^[[:space:]]*$ ]] && continue
         
         # Parse whitelist entries
-        if [[ "$line" =~ ^whitelist[[:space:]]+([^[:space:]#]+) ]]; then
+        if [[ "$line" =~ ^WHITELIST[[:space:]]+([^[:space:]#]+) ]]; then
             whitelist_commands["${BASH_REMATCH[1]}"]=1
+        # Parse critical command additions
+        elif [[ "$line" =~ ^CRITICAL[[:space:]]+([^[:space:]#]+) ]]; then
+            critical_additions+=("${BASH_REMATCH[1]}")
+            ${debug:-false} && builtin echo "DEBUG: Adding critical command: ${BASH_REMATCH[1]}" >&2
+        # Parse critical command removals
+        elif [[ "$line" =~ ^NONCRITICAL[[:space:]]+([^[:space:]#]+) ]]; then
+            critical_removals+=("${BASH_REMATCH[1]}")
+            ${debug:-false} && builtin echo "DEBUG: Removing critical command: ${BASH_REMATCH[1]}" >&2
         fi
     done < "$config_file"
 else
     ${debug:-false} && builtin echo "DEBUG: No config file found in search paths" >&2
 fi
+
+# Initialize CRITICAL array with defaults and apply config modifications
+CRITICAL=("cd" "rm" "mv" "sudo" "kill" "sh" "bash" "echo" "printf")
+
+# Add critical commands from config
+for cmd in "${critical_additions[@]}"; do
+    # Check if command is not already in the array
+    already_present=false
+    for existing in "${CRITICAL[@]}"; do
+        if [[ "$existing" == "$cmd" ]]; then
+            already_present=true
+            break
+        fi
+    done
+    if ! $already_present; then
+        CRITICAL+=("$cmd")
+        ${debug:-false} && builtin echo "DEBUG: Added '$cmd' to critical commands list" >&2
+    fi
+done
+
+# Remove critical commands from config
+for cmd in "${critical_removals[@]}"; do
+    new_critical=()
+    for existing in "${CRITICAL[@]}"; do
+        if [[ "$existing" != "$cmd" ]]; then
+            new_critical+=("$existing")
+        else
+            ${debug:-false} && builtin echo "DEBUG: Removed '$cmd' from critical commands list" >&2
+        fi
+    done
+    CRITICAL=("${new_critical[@]}")
+done
 
 # Source extra alias file if provided
 if [[ -n "$extra_alias_file" && -f "$extra_alias_file" ]]; then
