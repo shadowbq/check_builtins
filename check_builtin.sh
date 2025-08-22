@@ -3,23 +3,26 @@
 set -euo pipefail
 shopt -s expand_aliases
 
-VERSION="1.1.1"
+VERSION="1.2.0"
 
-# Optionally load bashrc files (to capture user aliases) unless disabled
-# Typical realworld loading order
-## /etc/profile → ~/.bash_profile → (which sources ~/.bashrc) → ~/.bashrc → /etc/bash.bashrc
-if [[ -z "${CHECK_BUILTINS_NO_RC:-}" ]]; then
-    for _rc in ~/.bashrc ~/.bash_profile /etc/bash.bashrc; do
-        if [[ -f "$_rc" ]]; then
-            # Temporarily relax nounset and ensure PS1 defined to avoid errors
-            set +u
-            : "${PS1:=}"  # define PS1 if unset
-            # shellcheck disable=SC1090
-            source "$_rc" || true
-            set -u
-        fi
-    done
-fi
+# -------- Load bashrc files --------
+load_bashrc_files() {
+    # Optionally load bashrc files (to capture user aliases) unless disabled
+    # Typical realworld loading order
+    ## /etc/profile → ~/.bash_profile → (which sources ~/.bashrc) → ~/.bashrc → /etc/bash.bashrc
+    if [[ -z "${CHECK_BUILTINS_NO_RC:-}" ]]; then
+        for _rc in ~/.bashrc ~/.bash_profile /etc/bash.bashrc; do
+            if [[ -f "$_rc" ]]; then
+                # Temporarily relax nounset and ensure PS1 defined to avoid errors
+                set +u
+                : "${PS1:=}"  # define PS1 if unset
+                # shellcheck disable=SC1090
+                (source "$_rc") || true  # Run in subshell to prevent env pollution
+                set -u
+            fi
+        done
+    fi
+}
 
 # -------- Colors --------
 RED="\033[31m"
@@ -76,15 +79,18 @@ Exit codes:
 EOF
 }
 
-# -------- Defaults --------
-all_mode=false
-show_functions=false
-show_aliases=false
-strict=false
-debug=false
-json_output=""
-single_command=""
-extra_alias_file=""
+# -------- Initialize variables --------
+initialize_variables() {
+    # Defaults (declared as global)
+    declare -g all_mode=false
+    declare -g show_functions=false
+    declare -g show_aliases=false
+    declare -g strict=false
+    declare -g debug=false
+    declare -g json_output=""
+    declare -g single_command=""
+    declare -g extra_alias_file=""
+}
 
 # -------- Debug function --------
 debug_log() {
@@ -94,34 +100,39 @@ debug_log() {
 }
 
 # -------- Arg parsing --------
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -a|--all) all_mode=true ;;
-        --functions) show_functions=true ;;
-        --aliases) show_aliases=true ;;
-        --strict) strict=true ;;
-        --debug) debug=true ;;
-    --json) shift; json_output="$1" ;;
-    --alias-file) shift; extra_alias_file="$1" ;;
-        -h|--help) show_help; exit 0 ;;
-        --version) show_version; exit 0 ;;
-        *)
-            if [[ -n "$single_command" ]]; then
-                builtin echo "Error: Multiple commands given: '$single_command' and '$1'" >&2
-                exit 1
-            fi
-            single_command="$1"
-            ;;
-    esac
-    shift
-done
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -a|--all) all_mode=true ;;
+            --functions) show_functions=true ;;
+            --aliases) show_aliases=true ;;
+            --strict) strict=true ;;
+            --debug) debug=true ;;
+        --json) shift; json_output="$1" ;;
+        --alias-file) shift; extra_alias_file="$1" ;;
+            -h|--help) show_help; exit 0 ;;
+            --version) show_version; exit 0 ;;
+            *)
+                if [[ -n "$single_command" ]]; then
+                    builtin echo "Error: Multiple commands given: '$single_command' and '$1'" >&2
+                    exit 1
+                fi
+                single_command="$1"
+                ;;
+        esac
+        shift
+    done
+}
 
 # -------- Builtins list --------
-readarray -t builtin_list < <({ builtin compgen -b; builtin compgen -k; } | command sort | command uniq)
+initialize_builtins() {
+    readarray -t builtin_list < <({ builtin compgen -b; builtin compgen -k; } | command sort | command uniq)
+    declare -ga builtin_list
 
-# Build a quick lookup associative array for builtins
-declare -A builtin_lookup
-for _b in "${builtin_list[@]}"; do builtin_lookup["$_b"]=1; done
+    # Build a quick lookup associative array for builtins
+    declare -gA builtin_lookup
+    for _b in "${builtin_list[@]}"; do builtin_lookup["$_b"]=1; done
+}
 
 # -------- Whitelist --------
 find_config_file() {
@@ -143,71 +154,78 @@ find_config_file() {
     return 1
 }
 
-declare -A whitelist_commands
-declare -a critical_additions=()
-declare -a critical_removals=()
+# -------- Configuration loading --------
+load_configuration() {
+    declare -gA whitelist_commands
+    declare -ga critical_additions=()
+    declare -ga critical_removals=()
 
-if config_file=$(find_config_file); then
-    ${debug:-false} && builtin echo "DEBUG: Found config file: $config_file" >&2
-    while IFS= read -r line; do
-        # Skip comments and empty lines
-        [[ "$line" =~ ^[[:space:]]*# ]] && continue
-        [[ "$line" =~ ^[[:space:]]*$ ]] && continue
-        
-        # Parse whitelist entries
-        if [[ "$line" =~ ^WHITELIST[[:space:]]+([^[:space:]#]+) ]]; then
-            whitelist_commands["${BASH_REMATCH[1]}"]=1
-        # Parse critical command additions
-        elif [[ "$line" =~ ^CRITICAL[[:space:]]+([^[:space:]#]+) ]]; then
-            critical_additions+=("${BASH_REMATCH[1]}")
-            ${debug:-false} && builtin echo "DEBUG: Adding critical command: ${BASH_REMATCH[1]}" >&2
-        # Parse critical command removals
-        elif [[ "$line" =~ ^NONCRITICAL[[:space:]]+([^[:space:]#]+) ]]; then
-            critical_removals+=("${BASH_REMATCH[1]}")
-            ${debug:-false} && builtin echo "DEBUG: Removing critical command: ${BASH_REMATCH[1]}" >&2
-        fi
-    done < "$config_file"
-else
-    ${debug:-false} && builtin echo "DEBUG: No config file found in search paths" >&2
-fi
+    if config_file=$(find_config_file); then
+        if $debug; then builtin echo "DEBUG: Found config file: $config_file" >&2; fi
+        while IFS= read -r line; do
+            # Skip comments and empty lines
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+            
+            # Parse whitelist entries
+            if [[ "$line" =~ ^WHITELIST[[:space:]]+([^[:space:]#]+) ]]; then
+                whitelist_commands["${BASH_REMATCH[1]}"]=1
+            # Parse critical command additions
+            elif [[ "$line" =~ ^CRITICAL[[:space:]]+([^[:space:]#]+) ]]; then
+                critical_additions+=("${BASH_REMATCH[1]}")
+                if $debug; then builtin echo "DEBUG: Adding critical command: ${BASH_REMATCH[1]}" >&2; fi
+            # Parse critical command removals
+            elif [[ "$line" =~ ^NONCRITICAL[[:space:]]+([^[:space:]#]+) ]]; then
+                critical_removals+=("${BASH_REMATCH[1]}")
+                if $debug; then builtin echo "DEBUG: Removing critical command: ${BASH_REMATCH[1]}" >&2; fi
+            fi
+        done < "$config_file"
+    else
+        if $debug; then builtin echo "DEBUG: No config file found in search paths" >&2; fi
+    fi
+}
 
 # Initialize CRITICAL array with defaults and apply config modifications
-CRITICAL=("cd" "rm" "mv" "sudo" "kill" "sh" "bash" "echo" "printf" "ls")
+initialize_critical_commands() {
+    declare -ga CRITICAL=("cd" "rm" "mv" "sudo" "kill" "sh" "bash" "echo" "printf" "ls")
 
-# Add critical commands from config
-for cmd in "${critical_additions[@]}"; do
-    # Check if command is not already in the array
-    already_present=false
-    for existing in "${CRITICAL[@]}"; do
-        if [[ "$existing" == "$cmd" ]]; then
-            already_present=true
-            break
+    # Add critical commands from config
+    for cmd in "${critical_additions[@]}"; do
+        # Check if command is not already in the array
+        already_present=false
+        for existing in "${CRITICAL[@]}"; do
+            if [[ "$existing" == "$cmd" ]]; then
+                already_present=true
+                break
+            fi
+        done
+        if ! $already_present; then
+            CRITICAL+=("$cmd")
+            if $debug; then builtin echo "DEBUG: Added '$cmd' to critical commands list" >&2; fi
         fi
     done
-    if ! $already_present; then
-        CRITICAL+=("$cmd")
-        ${debug:-false} && builtin echo "DEBUG: Added '$cmd' to critical commands list" >&2
-    fi
-done
 
-# Remove critical commands from config
-for cmd in "${critical_removals[@]}"; do
-    new_critical=()
-    for existing in "${CRITICAL[@]}"; do
-        if [[ "$existing" != "$cmd" ]]; then
-            new_critical+=("$existing")
-        else
-            ${debug:-false} && builtin echo "DEBUG: Removed '$cmd' from critical commands list" >&2
-        fi
+    # Remove critical commands from config
+    for cmd in "${critical_removals[@]}"; do
+        new_critical=()
+        for existing in "${CRITICAL[@]}"; do
+            if [[ "$existing" != "$cmd" ]]; then
+                new_critical+=("$existing")
+            else
+                if $debug; then builtin echo "DEBUG: Removed '$cmd' from critical commands list" >&2; fi
+            fi
+        done
+        CRITICAL=("${new_critical[@]}")
     done
-    CRITICAL=("${new_critical[@]}")
-done
+}
 
 # Source extra alias file if provided
-if [[ -n "$extra_alias_file" && -f "$extra_alias_file" ]]; then
-    # shellcheck disable=SC1090
-    source "$extra_alias_file" || true
-fi
+source_extra_alias_file() {
+    if [[ -n "$extra_alias_file" && -f "$extra_alias_file" ]]; then
+        # shellcheck disable=SC1090
+        source "$extra_alias_file" || true
+    fi
+}
 
 # -------- Functions --------
 check_command() {
@@ -344,76 +362,100 @@ print_table_row() {
 }
 
 # -------- Single command mode --------
-debug_log "single_command='$single_command' all_mode=$all_mode"
-if [[ -n "$single_command" ]]; then
-    debug_log "Entering single command mode"
-    result=$(check_command "$single_command") || true
-    debug_log "Debug result: $result"
-    IFS="|" read -r code cmd info <<<"$result"
-    debug_log "Debug parsed: code=$code cmd=$cmd info=$info"
-    print_table_header
-    print_table_row "$code" "$cmd" "$info"
-    exit $code
-fi
+run_single_command_mode() {
+    debug_log "single_command='$single_command' all_mode=$all_mode"
+    if [[ -n "$single_command" ]]; then
+        debug_log "Entering single command mode"
+        result=$(check_command "$single_command") || true
+        debug_log "Debug result: $result"
+        IFS="|" read -r code cmd info <<<"$result"
+        debug_log "Debug parsed: code=$code cmd=$cmd info=$info"
+        print_table_header
+        print_table_row "$code" "$cmd" "$info"
+        exit $code
+    fi
+    return 1  # Not single command mode
+}
 
 # -------- All mode --------
-if $all_mode; then
-    worst=0
-    declare -a json_array
-    declare -a checked_commands
-    
-    print_table_header
-    
-    # Check all builtins
-    for b in "${builtin_list[@]}"; do
-        result=$(check_command "$b") || true
-        IFS="|" read -r code cmd info <<<"$result"
-        print_table_row "$code" "$cmd" "$info"
-        (( code > worst )) && worst=$code
-        if [[ -n "$json_output" ]]; then
-            json_array+=("{\"command\":\"$cmd\",\"status\":$code,\"info\":\"${info//\"/\\\"}\"}")
-        fi
-        checked_commands+=("$cmd")
-    done
-
-    # If --aliases flag is used, also enumerate every alias (including plain ones)
-    if $show_aliases; then
-        builtin echo -e "\nActive aliases:"
+run_all_mode() {
+    if $all_mode; then
+        worst=0
+        declare -a json_array
+        declare -a checked_commands
+        
         print_table_header
-        while IFS= read -r alias_line; do
-            [[ $alias_line =~ ^alias[[:space:]]+([^=]+)= ]] || continue
-            alias_name="${BASH_REMATCH[1]}"
-            result=$(check_command "$alias_name") || true
+        
+        # Check all builtins
+        for b in "${builtin_list[@]}"; do
+            result=$(check_command "$b") || true
             IFS="|" read -r code cmd info <<<"$result"
             print_table_row "$code" "$cmd" "$info"
             (( code > worst )) && worst=$code
-        done < <(alias 2>/dev/null || true)
+            if [[ -n "$json_output" ]]; then
+                json_array+=("{\"command\":\"$cmd\",\"status\":$code,\"info\":\"${info//\"/\\\"}\"}")
+            fi
+            checked_commands+=("$cmd")
+        done
+
+        # If --aliases flag is used, also enumerate every alias (including plain ones)
+        if $show_aliases; then
+            builtin echo -e "\nActive aliases:"
+            print_table_header
+            while IFS= read -r alias_line; do
+                [[ $alias_line =~ ^alias[[:space:]]+([^=]+)= ]] || continue
+                alias_name="${BASH_REMATCH[1]}"
+                result=$(check_command "$alias_name") || true
+                IFS="|" read -r code cmd info <<<"$result"
+                print_table_row "$code" "$cmd" "$info"
+                (( code > worst )) && worst=$code
+            done < <(alias 2>/dev/null || true)
+        fi
+
+        builtin echo -e "\nCritical commands audit:"
+        print_table_header
+        for c in "${CRITICAL[@]}"; do
+            result=$(check_command "$c") || true
+            IFS="|" read -r code cmd info <<<"$result"
+            print_table_row "$code" "$cmd" "$info"
+        done
+
+        if $show_functions; then
+            builtin echo -e "\nUser-defined functions:"
+            builtin declare -F | awk '{print $3}'
+        fi
+
+        if [[ -n "$json_output" ]]; then
+            builtin printf '[%s]\n' "$(IFS=,; builtin echo "${json_array[*]}")" >"$json_output"
+            builtin echo "JSON report written to $json_output"
+        fi
+
+        if $strict; then
+            exit $worst
+        fi
+        exit 0
     fi
+    return 1  # Not all mode
+}
 
-    builtin echo -e "\nCritical commands audit:"
-    print_table_header
-    for c in "${CRITICAL[@]}"; do
-        result=$(check_command "$c") || true
-        IFS="|" read -r code cmd info <<<"$result"
-        print_table_row "$code" "$cmd" "$info"
-    done
+# -------- Main function --------
+main() {
+    # Load configuration and setup
+    # load_bashrc_files # skip for now..
+    initialize_variables
+    parse_arguments "$@"
+    initialize_builtins
+    load_configuration
+    initialize_critical_commands
+    source_extra_alias_file
 
-    if $show_functions; then
-        builtin echo -e "\nUser-defined functions:"
-        builtin declare -F | awk '{print $3}'
-    fi
+    # Run appropriate mode
+    run_single_command_mode || run_all_mode || {
+        # If we get here, no valid arguments were provided
+        show_help
+        exit 2  # Standard exit code for improper usage
+    }
+}
 
-    if [[ -n "$json_output" ]]; then
-        builtin printf '[%s]\n' "$(IFS=,; builtin echo "${json_array[*]}")" >"$json_output"
-        builtin echo "JSON report written to $json_output"
-    fi
-
-    if $strict; then
-        exit $worst
-    fi
-    exit 0
-fi
-
-# If we get here, no valid arguments were provided
-show_help
-exit 2  # Standard exit code for improper usage
+# Call main function with all arguments
+main "$@"

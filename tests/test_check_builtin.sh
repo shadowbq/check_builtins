@@ -274,7 +274,9 @@ test_critical_commands_config() {
     log_info "=== Testing Critical Commands Configuration ==="
     
     # Create a test config file for critical commands
-    cat > test_critical_config.txt << 'EOF'
+    local config_file
+    config_file="$(pwd)/test_critical_config.txt"
+    cat > "$config_file" << 'EOF'
 # Test critical commands configuration
 WHITELIST ls
 CRITICAL wget
@@ -283,12 +285,12 @@ NONCRITICAL echo
 EOF
     
     # Test that CRITICAL commands are added
-    CHECK_BUILTINS="test_critical_config.txt" run_test_output "CRITICAL adds commands" 0 "wget.*external" "$SCRIPT_PATH" --all
-    CHECK_BUILTINS="test_critical_config.txt" run_test_output "CRITICAL adds curl" 0 "curl.*external" "$SCRIPT_PATH" --all
+    CHECK_BUILTINS="$config_file" run_test_output "CRITICAL adds commands" 0 "wget.*external" "$SCRIPT_PATH" --all
+    CHECK_BUILTINS="$config_file" run_test_output "CRITICAL adds curl" 0 "curl.*external" "$SCRIPT_PATH" --all
     
     # Test that NONCRITICAL removes commands (echo should not appear in critical section)
     local output
-    if output=$(CHECK_BUILTINS="test_critical_config.txt" "$SCRIPT_PATH" --all 2>&1); then
+    if output=$(CHECK_BUILTINS="$config_file" "$SCRIPT_PATH" --all 2>&1); then
         if echo "$output" | grep -A 20 "Critical commands audit:" | grep -q "^echo"; then
             log_error "NONCRITICAL test failed - echo still appears in critical commands"
             ((TESTS_FAILED++))
@@ -303,11 +305,11 @@ EOF
     ((TESTS_RUN++))
     
     # Test debug output shows config processing
-    CHECK_BUILTINS="test_critical_config.txt" run_test_output "Critical config debug" 0 "Adding critical command: wget" "$SCRIPT_PATH" --debug echo
-    CHECK_BUILTINS="test_critical_config.txt" run_test_output "Critical config debug removal" 0 "Removing critical command: echo" "$SCRIPT_PATH" --debug echo
+    CHECK_BUILTINS="$config_file" run_test_output "Critical config debug" 0 "Adding critical command: wget" "$SCRIPT_PATH" --debug echo
+    CHECK_BUILTINS="$config_file" run_test_output "Critical config debug removal" 0 "Removing critical command: echo" "$SCRIPT_PATH" --debug echo
     
     # Clean up
-    rm -f test_critical_config.txt
+    rm -f "$config_file"
 }
 
 test_error_conditions() {
