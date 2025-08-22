@@ -318,7 +318,7 @@ DEBUG: Processing line: 'echo is a shell builtin'
 
 ## License
 
-This script is provided as-is for educational and administrative purposes. Use at your own risk.
+MIT License - Copyright (c) 2025 shadowbq
 
 ## Contributing
 
