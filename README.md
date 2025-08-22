@@ -217,6 +217,29 @@ WHITELIST grep
 WHITELIST find
 ```
 
+### Critical Commands
+
+Default Critical Commands
+
+```bash
+CRITICAL=("cd" "rm" "mv" "sudo" "kill" "sh" "bash" "echo" "printf")
+```
+
+Add additional critical commands to this section as needed one per line.
+
+```bash
+# Comments are allowed
+CRITICAL lsusb
+CRITICAL curl
+```
+
+Remove commands from this section if they are deemed non-critical one per line.
+
+```bash
+NONCRITICAL awk
+NONCRITICAL sed
+```
+
 ### Environment Variables
 
 - `CHECK_BUILTINS_NO_RC`: Set to disable loading of bashrc files
