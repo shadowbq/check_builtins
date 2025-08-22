@@ -3,11 +3,13 @@
 set -euo pipefail
 shopt -s expand_aliases
 
-VERSION="1.1.0"
+VERSION="1.1.1"
 
 # Optionally load bashrc files (to capture user aliases) unless disabled
+# Typical realworld loading order
+## /etc/profile → ~/.bash_profile → (which sources ~/.bashrc) → ~/.bashrc → /etc/bash.bashrc
 if [[ -z "${CHECK_BUILTINS_NO_RC:-}" ]]; then
-    for _rc in /etc/bash.bashrc ~/.bashrc; do
+    for _rc in ~/.bashrc ~/.bash_profile /etc/bash.bashrc; do
         if [[ -f "$_rc" ]]; then
             # Temporarily relax nounset and ensure PS1 defined to avoid errors
             set +u
@@ -115,7 +117,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # -------- Builtins list --------
-readarray -t builtin_list < <(builtin help | awk '/^ [a-z][a-zA-Z_]*[[:space:]]/ {print $1}' | grep -v '^job_spec$' | sort | uniq)
+readarray -t builtin_list < <({ builtin compgen -b; builtin compgen -k; } | command sort | command uniq)
 
 # Build a quick lookup associative array for builtins
 declare -A builtin_lookup
@@ -170,7 +172,7 @@ else
 fi
 
 # Initialize CRITICAL array with defaults and apply config modifications
-CRITICAL=("cd" "rm" "mv" "sudo" "kill" "sh" "bash" "echo" "printf")
+CRITICAL=("cd" "rm" "mv" "sudo" "kill" "sh" "bash" "echo" "printf" "ls")
 
 # Add critical commands from config
 for cmd in "${critical_additions[@]}"; do

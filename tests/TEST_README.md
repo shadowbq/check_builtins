@@ -38,6 +38,12 @@ This directory contains a comprehensive test suite for the `check_builtin.sh` sc
 # Test critical commands audit
 ./test_check_builtin.sh critical
 
+# Test builtin command detection
+./test_check_builtin.sh builtin-detection
+
+# Test critical commands configuration
+./test_check_builtin.sh critical-config
+
 # Test error conditions
 ./test_check_builtin.sh errors
 
@@ -89,6 +95,7 @@ The test suite covers:
 - ✅ Critical commands detection
 - ✅ External commands identification
 - ✅ Builtin commands verification
+- ✅ Required builtin detection (alias, bg, cd, dirs, echo, false, for, hash, mapfile, read, time, type, ulimit, while)
 
 ### Performance
 - ✅ Performance regression testing (< 10 seconds threshold)

@@ -227,6 +227,49 @@ test_critical_commands() {
     run_test_output "Critical commands audit" 0 "Critical commands audit:" "$SCRIPT_PATH" --all
 }
 
+test_builtin_detection() {
+    log_info "=== Testing Builtin Command Detection ==="
+    
+    # Test that the script detects all expected builtin commands
+    # These are the commands that should be found in the builtin list
+    local expected_commands=("alias" "bg" "cd" "dirs" "echo" "false" "for" "hash" "mapfile" "read" "time" "type" "ulimit" "while")
+    
+    log_info "Testing detection of required builtin commands..."
+    
+    # Run the script and capture the output
+    local output
+    if output=$("$SCRIPT_PATH" --all 2>&1); then
+        local test_passed=true
+        local missing_commands=()
+        
+        # Check that each expected command appears in the output
+        for cmd in "${expected_commands[@]}"; do
+            if echo "$output" | grep -q "^$cmd"; then
+                log_success "Found required builtin: $cmd"
+            else
+                log_error "Missing required builtin: $cmd"
+                missing_commands+=("$cmd")
+                test_passed=false
+            fi
+        done
+        
+        if $test_passed; then
+            log_success "All required builtin commands detected ✓"
+            ((TESTS_PASSED++))
+        else
+            log_error "Missing builtin commands: ${missing_commands[*]}"
+            echo "This indicates the builtin detection method needs improvement."
+            echo "Current builtin extraction may be missing commands from the second column of 'builtin help' output."
+            ((TESTS_FAILED++))
+        fi
+    else
+        log_error "Failed to run script for builtin detection test"
+        ((TESTS_FAILED++))
+    fi
+    
+    ((TESTS_RUN++))
+}
+
 test_critical_commands_config() {
     log_info "=== Testing Critical Commands Configuration ==="
     
@@ -423,6 +466,8 @@ main() {
     echo
     test_critical_commands
     echo
+    test_builtin_detection
+    echo
     test_critical_commands_config
     echo
     test_error_conditions
@@ -500,6 +545,11 @@ if [[ $# -gt 0 ]]; then
             test_critical_commands 
             cleanup_test_files
             ;;
+        builtin-detection) 
+            setup_test_files
+            test_builtin_detection 
+            cleanup_test_files
+            ;;
         critical-config) 
             setup_test_files
             test_critical_commands_config 
@@ -536,7 +586,7 @@ if [[ $# -gt 0 ]]; then
             cleanup_test_files
             ;;
         *)
-            echo "Usage: $0 [help|single|all|options|aliases|whitelist|critical|critical-config|errors|env|exit|performance|robustness|integration]"
+            echo "Usage: $0 [help|single|all|options|aliases|whitelist|critical|builtin-detection|critical-config|errors|env|exit|performance|robustness|integration]"
             echo "Or run without arguments to run all tests"
             exit 1
             ;;
