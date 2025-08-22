@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# MIT License - Copyright (c) 2025 shadowbq
 set -euo pipefail
 shopt -s expand_aliases
 
