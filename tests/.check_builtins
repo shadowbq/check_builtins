@@ -1,0 +1,26 @@
+# Sample configuration file for check_builtins.sh
+# This file demonstrates the whitelist configuration format
+# 
+# Lines starting with # are comments and will be ignored
+# Empty lines are also ignored
+#
+# To whitelist a command that overrides a builtin, use:
+# whitelist <command_name>
+
+# Common commands that users often alias or override
+whitelist ls        # Often aliased to 'ls --color=auto'
+whitelist grep      # Often aliased to 'grep --color=auto'
+
+# Development tools that may be overridden
+whitelist vim       # May be aliased to nvim or other editors
+whitelist git       # Sometimes wrapped with custom functions
+
+# System commands that may have legitimate overrides
+whitelist find      # Sometimes aliased with common options
+whitelist df        # May be aliased with formatting options
+
+# Example of commands you might want to monitor (commented out)
+# These would show as overrides if uncommented:
+# whitelist cd        # Usually not recommended to override
+# whitelist rm        # Potentially dangerous to override
+# whitelist sudo      # Security risk if overridden

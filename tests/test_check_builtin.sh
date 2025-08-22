@@ -19,7 +19,7 @@ TESTS_PASSED=0
 TESTS_FAILED=0
 
 # Test script path
-SCRIPT_PATH="./check_builtin.sh"
+SCRIPT_PATH="$(pwd)/check_builtin.sh"
 if [[ ! -x "$SCRIPT_PATH" ]]; then
     echo -e "${RED}ERROR: $SCRIPT_PATH not found or not executable${RESET}" >&2
     exit 1
@@ -245,6 +245,34 @@ test_environment_variables() {
     
     # Test with CHECK_BUILTINS_NO_RC set
     CHECK_BUILTINS_NO_RC=1 run_test "No RC loading" 0 "$SCRIPT_PATH" echo
+    
+    # Test CHECK_BUILTINS environment variable for custom config path
+    log_info "Testing CHECK_BUILTINS environment variable..."
+    
+    # Create a temporary config file
+    local temp_config="/tmp/test_check_builtins_$$"
+    cat > "$temp_config" << 'EOF'
+# Test configuration from environment variable
+whitelist test_env_command
+whitelist ls
+EOF
+    
+    # Test that the environment variable config is found and used
+    CHECK_BUILTINS="$temp_config" run_test_output "Custom config via ENV" 0 "DEBUG.*Found config file.*$temp_config" "$SCRIPT_PATH" --debug echo
+    
+    # Test with non-existent config path in environment
+    CHECK_BUILTINS="/nonexistent/config/file" run_test "Non-existent ENV config" 0 "$SCRIPT_PATH" echo
+    
+    # Test that config in tests directory is found when no ENV is set
+    # (since we have .check_builtins in tests/ directory)
+    cd tests 2>/dev/null || true
+    if [[ -f ".check_builtins" ]]; then
+        run_test_output "Config from tests directory" 0 "DEBUG.*Found config file.*\\.check_builtins" "$SCRIPT_PATH" --debug echo
+    fi
+    cd .. 2>/dev/null || true
+    
+    # Clean up
+    rm -f "$temp_config"
 }
 
 test_exit_codes() {

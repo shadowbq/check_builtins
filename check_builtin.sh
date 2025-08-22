@@ -3,7 +3,7 @@
 set -euo pipefail
 shopt -s expand_aliases
 
-VERSION="1.0.0"
+VERSION="1.0.1"
 
 # Optionally load bashrc files (to capture user aliases) unless disabled
 if [[ -z "${CHECK_BUILTINS_NO_RC:-}" ]]; then
@@ -79,6 +79,13 @@ json_output=""
 single_command=""
 extra_alias_file=""
 
+# -------- Debug function --------
+debug_log() {
+    if $debug; then
+        builtin echo "DEBUG: $*" >&2
+    fi
+}
+
 # -------- Arg parsing --------
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -110,9 +117,28 @@ declare -A builtin_lookup
 for _b in "${builtin_list[@]}"; do builtin_lookup["$_b"]=1; done
 
 # -------- Whitelist --------
+find_config_file() {
+    local config_name=".check_builtins"
+    local search_paths=(
+        "${CHECK_BUILTINS:-}"                    # 1. ENV CHECK_BUILTINS
+        "./$config_name"                         # 2. Current directory of execution
+        "${BASH_SOURCE[0]%/*}/$config_name"      # 3. Directory location of BASH_SOURCE[0]
+        "$HOME/$config_name"                     # 4. $HOME
+        "/usr/local/etc/$config_name"            # 5. /usr/local/etc
+        "/etc/$config_name"                      # 6. /etc
+    )
+    
+    for path in "${search_paths[@]}"; do
+        # Skip empty paths (like when CHECK_BUILTINS is unset)
+        [[ -n "$path" && -f "$path" ]] && { builtin echo "$path"; return 0; }
+    done
+    
+    return 1
+}
+
 declare -A whitelist_commands
-config_file="${BASH_SOURCE[0]%/*}/.check_builtins"
-if [[ -f "$config_file" ]]; then
+if config_file=$(find_config_file); then
+    ${debug:-false} && builtin echo "DEBUG: Found config file: $config_file" >&2
     while IFS= read -r line; do
         # Skip comments and empty lines
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
@@ -123,6 +149,8 @@ if [[ -f "$config_file" ]]; then
             whitelist_commands["${BASH_REMATCH[1]}"]=1
         fi
     done < "$config_file"
+else
+    ${debug:-false} && builtin echo "DEBUG: No config file found in search paths" >&2
 fi
 
 # Source extra alias file if provided
@@ -132,12 +160,6 @@ if [[ -n "$extra_alias_file" && -f "$extra_alias_file" ]]; then
 fi
 
 # -------- Functions --------
-debug_log() {
-    if $debug; then
-        builtin echo "DEBUG: $*" >&2
-    fi
-}
-
 check_command() {
     local cmd="$1"
     debug_log "check_command called with '$cmd'"

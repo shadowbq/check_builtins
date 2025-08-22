@@ -8,7 +8,7 @@ This script helps system administrators and developers identify when shell built
 
 ## Features
 
-- **Single Command Check**: Verify the type and status of a specific command
+- **Single Command Check**: Verify the shell `type` and status of a specific command
 - **Bulk Analysis**: Check all shell builtins for overrides
 - **Critical Commands Audit**: Special focus on security-critical commands
 - **Whitelist Support**: Configure exceptions for legitimate overrides
