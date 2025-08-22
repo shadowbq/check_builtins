@@ -408,6 +408,108 @@ test_script_robustness() {
 }
 
 # Functional integration tests
+test_sourcing_functionality() {
+    log_info "=== Testing Sourcing Functionality ==="
+    
+    # Test that script can be sourced without executing main
+    local test_script="/tmp/test_sourcing_$$"
+    cat > "$test_script" << 'EOF'
+#!/bin/bash
+# Test script to verify sourcing functionality
+
+# Source the script
+source "./check_builtin.sh" 2>/dev/null || exit 1
+
+# Verify that main was not called by checking we're still in this script
+# If main was called, it would have exited or shown help
+
+# Test that functions are available after sourcing
+if declare -f show_version > /dev/null 2>&1; then
+    echo "PASS: show_version function available"
+else
+    echo "FAIL: show_version function not available"
+    exit 1
+fi
+
+if declare -f debug_log > /dev/null 2>&1; then
+    echo "PASS: debug_log function available"
+else
+    echo "FAIL: debug_log function not available"
+    exit 1
+fi
+
+if declare -f initialize_variables > /dev/null 2>&1; then
+    echo "PASS: initialize_variables function available"
+else
+    echo "FAIL: initialize_variables function not available"
+    exit 1
+fi
+
+# Test that we can call individual functions
+# Note: We need to initialize variables first for some functions to work
+initialize_variables
+
+# Test show_version function
+if version_output=$(show_version 2>&1) && echo "$version_output" | grep -q "check_builtins.sh version"; then
+    echo "PASS: show_version function works correctly"
+else
+    echo "FAIL: show_version function doesn't work: $version_output"
+    exit 1
+fi
+
+# Test debug_log function (should not output anything when debug=false)
+debug_output=$(debug_log "test message" 2>&1)
+if [[ -z "$debug_output" ]]; then
+    echo "PASS: debug_log respects debug=false"
+else
+    echo "FAIL: debug_log produced output when debug=false: $debug_output"
+    exit 1
+fi
+
+# Enable debug and test again
+debug=true
+debug_output=$(debug_log "test message" 2>&1)
+if echo "$debug_output" | grep -q "DEBUG: test message"; then
+    echo "PASS: debug_log works when debug=true"
+else
+    echo "FAIL: debug_log doesn't work when debug=true: $debug_output"
+    exit 1
+fi
+
+echo "PASS: All sourcing tests passed"
+exit 0
+EOF
+
+    chmod +x "$test_script"
+    
+    # Run the test script
+    ((TESTS_RUN++))
+    local output
+    if output=$("$test_script" 2>&1) && echo "$output" | grep -q "PASS: All sourcing tests passed"; then
+        log_success "Sourcing functionality test passed ✓"
+        ((TESTS_PASSED++))
+    else
+        log_error "Sourcing functionality test failed"
+        echo "Test output:"
+        echo "$output"
+        echo "---"
+        ((TESTS_FAILED++))
+    fi
+    
+    # Clean up
+    rm -f "$test_script"
+    
+    # Test that script still works normally when executed directly
+    ((TESTS_RUN++))
+    if "$SCRIPT_PATH" --version | grep -q "check_builtins.sh version"; then
+        log_success "Script still works when executed directly ✓"
+        ((TESTS_PASSED++))
+    else
+        log_error "Script doesn't work when executed directly after sourcing changes"
+        ((TESTS_FAILED++))
+    fi
+}
+
 test_integration() {
     log_info "=== Integration Tests ==="
     
@@ -481,6 +583,8 @@ main() {
     test_performance
     echo
     test_script_robustness
+    echo
+    test_sourcing_functionality
     echo
     test_integration
     
@@ -582,13 +686,18 @@ if [[ $# -gt 0 ]]; then
             test_script_robustness 
             cleanup_test_files
             ;;
+        sourcing) 
+            setup_test_files
+            test_sourcing_functionality 
+            cleanup_test_files
+            ;;
         integration) 
             setup_test_files
             test_integration 
             cleanup_test_files
             ;;
         *)
-            echo "Usage: $0 [help|single|all|options|aliases|whitelist|critical|builtin-detection|critical-config|errors|env|exit|performance|robustness|integration]"
+            echo "Usage: $0 [help|single|all|options|aliases|whitelist|critical|builtin-detection|critical-config|errors|env|exit|performance|robustness|sourcing|integration]"
             echo "Or run without arguments to run all tests"
             exit 1
             ;;

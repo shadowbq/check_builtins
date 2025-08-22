@@ -3,7 +3,16 @@
 set -euo pipefail
 shopt -s expand_aliases
 
-VERSION="1.2.0"
+# ---------Constants---------
+VERSION="1.2.1"
+RED="\033[31m"
+GREEN="\033[32m"
+YELLOW="\033[33m"
+BOLD="\033[1m"
+RESET="\033[0m"
+CHECKMARK="${GREEN}✔${RESET}"
+CROSS="${RED}❌${RESET}"
+WARN="${YELLOW}⚠${RESET}"
 
 # -------- Load bashrc files --------
 load_bashrc_files() {
@@ -24,25 +33,13 @@ load_bashrc_files() {
     fi
 }
 
-# -------- Colors --------
-RED="\033[31m"
-GREEN="\033[32m"
-YELLOW="\033[33m"
-BOLD="\033[1m"
-RESET="\033[0m"
-CHECKMARK="${GREEN}✔${RESET}"
-CROSS="${RED}❌${RESET}"
-WARN="${YELLOW}⚠${RESET}"
-
-# -------- Critical commands (default list, can be modified by config) --------
-# This will be initialized after config file parsing
-
-# -------- Help --------
+# -------- Version --------
 show_version() {
     builtin echo "check_builtins.sh version $VERSION"
     builtin echo "MIT License - Copyright (c) 2025 shadowbq"
 }
 
+# -------- Help --------
 show_help() {
     command cat <<EOF
 Usage:
@@ -126,7 +123,21 @@ parse_arguments() {
 
 # -------- Builtins list --------
 initialize_builtins() {
-    readarray -t builtin_list < <({ builtin compgen -b; builtin compgen -k; } | command sort | command uniq)
+    # Get all shell builtins and keywords, sort them, and remove duplicates
+    # Step 1: Get shell builtins (cd, echo, read, etc.)
+    local builtins_output
+    builtins_output=$(builtin compgen -b)
+    
+    # Step 2: Get shell keywords (if, for, while, etc.)
+    local keywords_output
+    keywords_output=$(builtin compgen -k)
+    
+    # Step 3: Combine both lists, sort alphabetically, and remove duplicates
+    local combined_output
+    combined_output=$(printf '%s\n%s\n' "$builtins_output" "$keywords_output" | command sort | command uniq)
+    
+    # Step 4: Read the sorted, unique list into an array
+    readarray -t builtin_list <<< "$combined_output"
     declare -ga builtin_list
 
     # Build a quick lookup associative array for builtins
@@ -185,6 +196,7 @@ load_configuration() {
     fi
 }
 
+# -------- Critical commands (default list, can be modified by config) --------
 # Initialize CRITICAL array with defaults and apply config modifications
 initialize_critical_commands() {
     declare -ga CRITICAL=("cd" "rm" "mv" "sudo" "kill" "sh" "bash" "echo" "printf" "ls")
@@ -227,7 +239,7 @@ source_extra_alias_file() {
     fi
 }
 
-# -------- Functions --------
+# -------- check_command Function --------
 check_command() {
     local cmd="$1"
     debug_log "check_command called with '$cmd'"
@@ -335,6 +347,7 @@ check_command() {
     return $status
 }
 
+# -------- Colorization --------
 colorize_status() {
     local code="$1"
     case "$code" in
@@ -352,6 +365,7 @@ print_table_header() {
     builtin printf "%-20s %-6s %s\n" "-------" "------" "----"
 }
 
+# -------- Table output --------
 print_table_row() {
     local code="$1"
     local cmd="$2"
@@ -457,5 +471,7 @@ main() {
     }
 }
 
-# Call main function with all arguments
-main "$@"
+# Only call main if script is executed directly (not sourced)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

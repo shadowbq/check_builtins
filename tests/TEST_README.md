@@ -17,93 +17,42 @@ This directory contains a comprehensive test suite for the `check_builtin.sh` sc
 
 ### Run Specific Test Categories
 ```bash
-# Test help functionality
-./test_check_builtin.sh help
-
-# Test single command mode
-./test_check_builtin.sh single
-
-# Test all mode functionality
-./test_check_builtin.sh all
-
-# Test command options
-./test_check_builtin.sh options
-
-# Test alias file loading
-./test_check_builtin.sh aliases
-
-# Test whitelist functionality
-./test_check_builtin.sh whitelist
-
-# Test critical commands audit
-./test_check_builtin.sh critical
-
-# Test builtin command detection
-./test_check_builtin.sh builtin-detection
-
-# Test critical commands configuration
-./test_check_builtin.sh critical-config
-
-# Test error conditions
-./test_check_builtin.sh errors
-
-# Test environment variables
-./test_check_builtin.sh env
-
-# Test exit codes
-./test_check_builtin.sh exit
-
-# Test performance
-./test_check_builtin.sh performance
-
-# Test script robustness
-./test_check_builtin.sh robustness
-
-# Test integration
-./test_check_builtin.sh integration
+./test_check_builtin.sh [category]
 ```
+
+Available categories: `help`, `single`, `all`, `options`, `aliases`, `whitelist`, `critical`, `builtin-detection`, `critical-config`, `errors`, `env`, `exit`, `performance`, `robustness`, `sourcing`, `integration`
 
 ## Test Coverage
 
-The test suite covers:
+The test suite provides comprehensive coverage including:
 
-### Core Functionality
-- ✅ Help display (`-h`, `--help`)
-- ✅ Single command checking with all exit codes (0-4)
-- ✅ All mode functionality (`--all`, `-a`)
-- ✅ Critical commands audit
+- **Core functionality**: Help system, single/all command modes, critical commands audit
+- **Command options**: All CLI flags (`--strict`, `--debug`, `--functions`, `--aliases`, `--json`, `--alias-file`)
+- **Error handling**: Invalid arguments, missing files, edge cases
+- **Environment testing**: Various PATH configurations, environment variables, minimal environments
+- **Integration**: End-to-end testing of real command detection and classification
+- **Performance**: Execution time validation (< 10 seconds)
+- **Robustness**: Limited environments, missing commands, different shell configurations
+- **Library functionality**: Script sourcing, individual function calls, backward compatibility
 
-### Command Options
-- ✅ Strict mode (`--strict`)
-- ✅ Debug mode (`--debug`)
-- ✅ Functions display (`--functions`)
-- ✅ Aliases display (`--aliases`)
-- ✅ JSON output (`--json`)
-- ✅ Alias file loading (`--alias-file`)
+Total test coverage includes 40+ individual tests across 16 test categories.
 
-### Error Handling
-- ✅ Multiple commands error handling
-- ✅ No arguments error handling
-- ✅ Non-existent files handling
+## Test Functions Reference
 
-### Environment Testing
-- ✅ Environment variable support (`CHECK_BUILTINS_NO_RC`)
-- ✅ Different PATH configurations
-- ✅ Minimal environment testing
+The test suite includes 16 comprehensive test functions:
 
-### Integration Tests
-- ✅ Critical commands detection
-- ✅ External commands identification
-- ✅ Builtin commands verification
-- ✅ Required builtin detection (alias, bg, cd, dirs, echo, false, for, hash, mapfile, read, time, type, ulimit, while)
+**Core Tests**: `help`, `single`, `all`, `options`, `aliases`, `whitelist`, `critical`  
+**Advanced Tests**: `builtin-detection`, `critical-config`, `errors`, `env`, `exit`  
+**Quality Tests**: `performance`, `robustness`, `sourcing`, `integration`
 
-### Performance
-- ✅ Performance regression testing (< 10 seconds threshold)
+Each test function thoroughly validates its respective functionality with multiple test cases, proper exit code verification, and output validation. Use `./test_check_builtin.sh [function-name]` to run individual test categories.
 
-### Robustness
-- ✅ Limited PATH handling
-- ✅ Missing command handling
-- ✅ Whitelist functionality
+## Test Helper Functions
+
+Key helper functions for consistent testing:
+- `run_test()` / `run_test_output()` - Execute commands and verify results
+- `setup_test_files()` / `cleanup_test_files()` - Manage test environment
+- `log_*()` functions - Provide colorized test output
 
 ## Exit Codes
 
@@ -111,40 +60,28 @@ The test script uses standard exit codes:
 - `0` - All tests passed
 - `1` - Some tests failed
 
-## Test Output
+## Using check_builtin.sh as a Library
 
-The test suite provides:
-- Colorized output for easy reading
-- Individual test results with ✓/✗ indicators
-- Detailed failure information when tests fail
+The script supports sourcing for library usage:
+
+```bash
+source ../check_builtin.sh
+initialize_variables
+show_version
+check_command "ls"
+```
+
+## Test Output & CI
+
+- Colorized output with ✓/✗ indicators and detailed failure information
 - Summary statistics (tests run, passed, failed, success rate)
-- Support for running individual test categories
-
-## Continuous Integration
-
-This test suite is designed to be run in CI/CD pipelines to ensure the `check_builtin.sh` script continues to work correctly across different environments and shell configurations.
+- Designed for CI/CD pipeline integration
 
 ## Adding New Tests
 
-To add new tests:
-
-1. Create a new test function following the naming pattern `test_*`
-2. Use the helper functions `run_test()` and `run_test_output()`
-3. Add the test to the main test runner function
-4. Add it to the individual test selector case statement
-
-Example:
-```bash
-test_new_functionality() {
-    log_info "=== Testing New Functionality ==="
-    
-    run_test_output "New feature test" 0 "expected_output" "$SCRIPT_PATH" --new-option
-}
-```
+1. Create `test_*` function using `run_test()` / `run_test_output()` helpers
+2. Add to main test runner and case statement
 
 ## Dependencies
 
-The test suite requires:
-- Bash 4.0+
-- Basic Unix utilities (grep, date, etc.)
-- The `check_builtin.sh` script in the same directory
+- Bash 4.0+, basic Unix utilities, `check_builtin.sh` script
