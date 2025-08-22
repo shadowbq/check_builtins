@@ -5,38 +5,38 @@
 # Default target - run comprehensive tests
 test:
 	@echo "Running comprehensive test suite..."
-	./test_check_builtin.sh
+	./tests/test_check_builtin.sh
 
 # CI-friendly test run
 test-ci:
 	@echo "Running CI test suite..."
-	./ci_test_check_builtin.sh
+	./tests/ci_test_check_builtin.sh
 
 # Run specific test categories
 test-help:
-	./test_check_builtin.sh help
+	./tests/test_check_builtin.sh help
 
 test-single:
-	./test_check_builtin.sh single
+	./tests/test_check_builtin.sh single
 
 test-all:
-	./test_check_builtin.sh all
+	./tests/test_check_builtin.sh all
 
 test-errors:
-	./test_check_builtin.sh errors
+	./tests/test_check_builtin.sh errors
 
 test-integration:
-	./test_check_builtin.sh integration
+	./tests/test_check_builtin.sh integration
 
 # Verbose test run
 test-verbose:
 	@echo "Running verbose tests..."
-	./test_check_builtin.sh
+	./tests/test_check_builtin.sh
 
 # Clean up any test artifacts
 clean:
 	@echo "Cleaning up test artifacts..."
-	rm -f test_aliases.sh .check_builtins test_output.json
+	rm -f ./tests/test_aliases.sh .check_builtins test_output.json
 
 # Quick smoke test
 smoke:
