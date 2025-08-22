@@ -4,7 +4,7 @@ set -euo pipefail
 shopt -s expand_aliases
 
 # ---------Constants---------
-VERSION="1.2.1"
+VERSION="1.2.2"
 RED="\033[31m"
 GREEN="\033[32m"
 YELLOW="\033[33m"
