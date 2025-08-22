@@ -3,6 +3,8 @@
 set -euo pipefail
 shopt -s expand_aliases
 
+VERSION="1.0.0"
+
 # Optionally load bashrc files (to capture user aliases) unless disabled
 if [[ -z "${CHECK_BUILTINS_NO_RC:-}" ]]; then
     for _rc in /etc/bash.bashrc ~/.bashrc; do
@@ -31,6 +33,11 @@ WARN="${YELLOW}⚠${RESET}"
 CRITICAL=("cd" "rm" "mv" "sudo" "kill" "sh" "bash" "echo" "printf")
 
 # -------- Help --------
+show_version() {
+    builtin echo "check_builtins.sh version $VERSION"
+    builtin echo "MIT License - Copyright (c) 2025 shadowbq"
+}
+
 show_help() {
     command cat <<EOF
 Usage:
@@ -44,6 +51,7 @@ Usage:
       --json <file>                # export results to JSON
       --alias-file <file>          # source additional alias file
   check_builtins.sh -h|--help      # show this help
+  check_builtins.sh --version      # show version information
 
 Exit codes:
   Single command mode:
@@ -82,6 +90,7 @@ while [[ $# -gt 0 ]]; do
     --json) shift; json_output="$1" ;;
     --alias-file) shift; extra_alias_file="$1" ;;
         -h|--help) show_help; exit 0 ;;
+        --version) show_version; exit 0 ;;
         *)
             if [[ -n "$single_command" ]]; then
                 builtin echo "Error: Multiple commands given: '$single_command' and '$1'" >&2

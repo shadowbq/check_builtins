@@ -22,15 +22,41 @@ This script helps system administrators and developers identify when shell built
 1. Clone or download the script:
 
 ```bash
-wget https://path/to/check_builtin.sh
+wget https://raw.githubusercontent.com/shadowbq/check_builtins/refs/heads/main/check_builtin.sh
 chmod +x check_builtin.sh
 ```
 
-1. Optionally, move to a directory in your PATH:
+2. Optionally, move to a directory in your PATH:
 
 ```bash
-sudo mv check_builtin.sh /usr/local/bin/
+sudo mv check_builtin.sh /usr/local/bin/check_builtin
 ```
+
+## Use Cases
+
+### Security Audit
+
+- Verify critical commands aren't overridden
+- Audit systems for unexpected aliases or functions
+- Compliance checking in production environments
+
+### Development Environment Setup
+
+- Ensure consistent command behavior across environments
+- Detect conflicting aliases or functions
+- Validate shell environment before deployment
+
+### Shell Troubleshooting
+
+- Diagnose unexpected command behavior
+- Identify source of command overrides
+- Debug shell configuration issues
+
+### Automation
+
+- Include in CI/CD pipelines for environment validation
+- Automated security compliance checking
+- System configuration drift detection
 
 ## Usage
 
@@ -108,6 +134,7 @@ Enable verbose debug output:
 | `--json <file>` | Export results to JSON file |
 | `--alias-file <file>` | Source additional alias file |
 | `-h, --help` | Show help message |
+| `--version` | Show version information |
 
 ## Output Format
 
@@ -258,31 +285,7 @@ $ cat audit.json
 [{"command":"alias","status":0,"info":"builtin"},{"command":"bg","status":0,"info":"builtin"}...]
 ```
 
-## Use Cases
 
-### Security Audit
-
-- Verify critical commands aren't overridden
-- Audit systems for unexpected aliases or functions
-- Compliance checking in production environments
-
-### Development Environment Setup
-
-- Ensure consistent command behavior across environments
-- Detect conflicting aliases or functions
-- Validate shell environment before deployment
-
-### Shell Troubleshooting
-
-- Diagnose unexpected command behavior
-- Identify source of command overrides
-- Debug shell configuration issues
-
-### Automation
-
-- Include in CI/CD pipelines for environment validation
-- Automated security compliance checking
-- System configuration drift detection
 
 ## Issues and Debugging
 
