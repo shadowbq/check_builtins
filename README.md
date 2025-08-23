@@ -98,7 +98,9 @@ This tool shows you the complete resolution chain and identifies which command a
 - **INFO** shows the complete detection chain with all available forms
 - **Symbols**: ✔ = safe builtin/keyword, ⚠ = external command, ❌ = override detected
 
-**Example Output:**
+## Example Output
+
+Single Command Check Mode
 
 ```bash
 $ ./check_builtin.sh echo
@@ -108,6 +110,85 @@ echo                 ✔ builtin | builtin external → /usr/bin/echo (PATH posi
 ```
 
 This shows: `echo` executes as a **builtin** (✔), but external alternatives exist at `/usr/bin/echo` and `/bin/echo` which would run if the builtin were disabled.
+
+Multi Command Check Mode
+
+```bash
+$ ./check_builtin.sh echo ls pwd
+./check_builtin.sh -a
+COMMAND              STATUS INFO
+-------              ------ ----
+!                    ✔ keyword | keyword
+.                    ✔ builtin | builtin
+:                    ✔ builtin | builtin
+[                    ✔ builtin | builtin external → /usr/bin/[ (PATH position 21) external → /bin/[ (PATH position 23)
+...snip...
+bg                   ✔ builtin | builtin
+bind                 ✔ builtin | builtin
+break                ✔ builtin | builtin
+...snip...
+dirs                 ✔ builtin | builtin
+disown               ✔ builtin | builtin
+do                   ✔ keyword | keyword
+done                 ✔ keyword | keyword
+echo                 ✔ builtin | builtin external → /usr/bin/echo (PATH position 21) external → /bin/echo (PATH position 23)
+elif                 ✔ keyword | keyword
+else                 ✔ keyword | keyword
+...snip...
+until                ✔ keyword | keyword
+wait                 ✔ builtin | builtin
+while                ✔ keyword | keyword
+
+Critical commands audit:
+COMMAND              STATUS INFO
+-------              ------ ----
+cd                   ✔ builtin | builtin
+rm                   ⚠ external command | external → /usr/bin/rm (PATH position 21) external → /bin/rm (PATH position 23)
+mv                   ⚠ external command | external → /usr/bin/mv (PATH position 21) external → /bin/mv (PATH position 23)
+sudo                 ⚠ external command | external → /usr/bin/sudo (PATH position 21) external → /bin/sudo (PATH position 23)
+kill                 ✔ builtin | builtin external → /usr/bin/kill (PATH position 21) external → /bin/kill (PATH position 23)
+sh                   ⚠ external command | external → /usr/bin/sh (PATH position 21) external → /bin/sh (PATH position 23)
+bash                 ⚠ external command | external → /usr/bin/bash (PATH position 21) external → /bin/bash (PATH position 23)
+echo                 ✔ builtin | builtin external → /usr/bin/echo (PATH position 21) external → /bin/echo (PATH position 23)
+printf               ✔ builtin | builtin external → /usr/bin/printf (PATH position 21) external → /bin/printf (PATH position 23)
+ls                   ⚠ external command | external → /usr/bin/ls (PATH position 21) external → /bin/ls (PATH position 23)
+```
+
+## Real-world Alias Detection
+
+### The Challenge
+
+When you run `./check_builtin.sh` directly, it cannot detect aliases from your current shell because aliases are not inherited by child processes. This is fundamental bash behavior - aliases only exist in the shell where they were defined.
+
+```bash
+# This won't detect your current shell's aliases
+$ alias ls='ls --color=auto'
+$ ./check_builtin.sh ls
+COMMAND              STATUS INFO
+-------              ------ ----
+ls                   ⚠      external command | external → /usr/bin/ls
+```
+
+### Real-world Usage
+
+To detect aliases from your current shell, source the script first and then use the export function:
+
+```bash
+source check_builtin.sh
+cb_export_current_aliases ls
+
+COMMAND              STATUS INFO
+-------              ------ ----
+ls                   ❌     alias override | alias → LC_COLLATE=C ls --color=auto | external → /usr/bin/ls
+```
+
+This will properly inherit all aliases from your current shell session and check the specified command.
+
+**✅ SAFE usage:**
+
+- Always use `cb_export_current_aliases()` only when the script is **sourced** (`source check_builtin.sh`)
+- The script includes safety checks to prevent accidental misuse
+
 
 ## Features
 
@@ -411,72 +492,6 @@ $ cat audit.json
 [{"command":"alias","status":0,"info":"builtin"},{"command":"bg","status":0,"info":"builtin"}...]
 ```
 
-## Real-world Alias Detection
-
-### The Challenge
-
-When you run `./check_builtin.sh` directly, it cannot detect aliases from your current shell because aliases are not inherited by child processes. This is fundamental bash behavior - aliases only exist in the shell where they were defined.
-
-```bash
-# This won't detect your current shell's aliases
-$ alias ls='ls --color=auto'
-$ ./check_builtin.sh ls
-COMMAND              STATUS INFO
--------              ------ ----
-ls                   ⚠      external command | external → /usr/bin/ls
-```
-
-### Real-world Usage
-
-To detect aliases from your current shell, source the script first and then use the export function:
-
-```bash
-source check_builtin.sh
-export_current_aliases ls
-```
-
-This will properly inherit all aliases from your current shell session and check the specified command.
-
-### ⚠️ IMPORTANT SAFETY WARNING
-
-The function `export_current_aliases()` uses the `exec` command, which **replaces your current shell process**. This can be destructive if used incorrectly.
-
-**❌ NEVER do this:**
-```bash
-# This will replace your shell process and exit your terminal!
-./check_builtin.sh  # Then calling export_current_aliases from within
-```
-
-**✅ SAFE usage:**
-
-- Always use `export_current_aliases()` only when the script is **sourced** (`source check_builtin.sh`)
-- The script includes safety checks to prevent accidental misuse
-
-### Testing Your Setup
-
-You can test if alias detection is working with debug output:
-
-```bash
-source check_builtin.sh
-export_current_aliases --debug ls
-```
-
-For testing specific alias scenarios, you can define test aliases in the same context:
-
-```bash
-bash -c 'alias ls="LC_COLLATE=C ls --color=auto"; source check_builtin.sh; export_current_aliases --debug ls'
-```
-
-This should show:
-```
-DEBUG: Captured aliases:
-alias ls='LC_COLLATE=C ls --color=auto'
-DEBUG: Number of aliases: 1
-...
-COMMAND              STATUS INFO
--------              ------ ----
-ls                   ❌     alias override | alias → LC_COLLATE=C ls --color=auto | external → /usr/bin/ls
-```
 
 ## Issues and Debugging
 

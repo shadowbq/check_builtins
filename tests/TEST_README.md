@@ -93,6 +93,33 @@ export_current_aliases ll
 
 This method is primarily for testing scenarios where you want to verify the script's behavior with specific alias definitions. For real-world usage with your actual shell aliases, use the standard method documented in the main README.
 
+
+### Testing Your Setup
+
+You can test if alias detection is working with debug output:
+
+```bash
+source check_builtin.sh
+export_current_aliases --debug ls
+```
+
+For testing specific alias scenarios, you can define test aliases in the same context:
+
+```bash
+bash -c 'alias ls="LC_COLLATE=C ls --color=auto"; source check_builtin.sh; export_current_aliases --debug ls'
+```
+
+This should show:
+```
+DEBUG: Captured aliases:
+alias ls='LC_COLLATE=C ls --color=auto'
+DEBUG: Number of aliases: 1
+...
+COMMAND              STATUS INFO
+-------              ------ ----
+ls                   ❌     alias override | alias → LC_COLLATE=C ls --color=auto | external → /usr/bin/ls
+```
+
 ## Test Output & CI
 
 - Colorized output with ✓/✗ indicators and detailed failure information
