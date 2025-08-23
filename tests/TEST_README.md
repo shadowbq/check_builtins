@@ -8,6 +8,39 @@ This directory contains a comprehensive test suite for the `check_builtin.sh` sc
 - `test_check_builtin.sh` - Comprehensive test suite
 - `README.md` - Documentation
 
+## Testing
+
+This repository includes comprehensive testing to ensure reliability:
+
+### Test Files
+- `test_check_builtin.sh` - Full comprehensive test suite with colorized output
+- `ci_test_check_builtin.sh` - CI-friendly minimal test runner
+- `Makefile` - Convenient test running targets
+
+### Running Tests
+
+```bash
+# Run comprehensive test suite
+./test_check_builtin.sh
+
+# Run CI-friendly tests
+./ci_test_check_builtin.sh
+
+# Run specific test categories
+./test_check_builtin.sh help      # Test help functionality
+./test_check_builtin.sh single    # Test single command mode
+./test_check_builtin.sh all       # Test all mode
+./test_check_builtin.sh errors    # Test error conditions
+
+# Using Makefile
+make test          # Comprehensive tests
+make test-ci       # CI tests
+make smoke         # Quick smoke test
+make clean         # Clean test artifacts
+```
+
+The test suite covers all functionality including exit codes, error conditions, environment variables, performance, and integration scenarios.
+
 ## Running Tests
 
 ### Run All Tests
