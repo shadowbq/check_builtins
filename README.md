@@ -1,10 +1,36 @@
 # check_builtin.sh
 
-A Bash utility to check whether commands are shell builtins, functions, aliases, or external binaries, with special focus on detecting potentially dangerous overrides of critical commands. The script should be used as a ***sourced*** file for real-world testing of your live shell context.
+A Bash(4.0+) utility to check whether commands are shell builtins, functions, aliases, or external binaries, with special focus on detecting potentially dangerous overrides of critical commands. The script should be used as a ***sourced*** file for real-world testing of your live shell context.
 
 ## Overview
 
 This script helps system administrators and developers identify when shell builtins are being overridden by aliases, functions, or external commands. This is particularly important for security and reliability, as overriding critical commands like `cd`, `rm`, `mv`, `sudo`, etc., can lead to unexpected behavior or security vulnerabilities.
+
+## Quick Example of Real-World Shell Manipulation
+
+* An alias is overriding the `ls` external command at `/usr/bin/ls`
+
+```bash
+$ alias ls='ls --color=auto'
+$ source check_builtin.sh
+$ cb_main ls
+
+COMMAND              STATUS INFO
+-------              ------ ----
+ls                   ❌     alias override | alias → LC_COLLATE=C ls --color=auto | external → /usr/bin/ls
+```
+
+* A function is overriding the `cd` builtin command that was loaded from .gvm (golang virtual manager, generally loaded from your `.bashrc`)
+
+```bash
+$ [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
+$ source check_builtin.sh
+$ cb_main cd
+
+COMMAND              STATUS INFO
+-------              ------ ----
+cd                   ❌ function override | function builtin
+```
 
 ## Features
 
@@ -17,6 +43,19 @@ This script helps system administrators and developers identify when shell built
 - **Colorized Output**: Visual indicators for different command types
 - **Alias File Support**: Load additional alias definitions
 - **Debug Mode**: Detailed logging for troubleshooting
+
+### Comparison to Other Tools
+
+* `type`, `which`, `command`, `builtin`, and `whence`: Standard shell utilities provide some information about command resolution, but:
+  * They often only show the first match or do not clearly indicate precedence between aliases, functions, and builtins.
+  * They each have their own quirks and behaviors that may not align with user expectations.
+  * They only focus on each type of command without considering the overall context.
+
+* `alias` and `declare -f`: These can list aliases and functions, but do not show how they interact or which takes precedence.
+* `ShellCheck`: While ShellCheck is a static analysis tool for shell scripts, it does not audit the live shell environment or resolve command precedence.
+* `envy`: A tool for managing environment variables, but it does not address command resolution or precedence.
+
+* NON-BASH tools like, oh-my-zsh, prezto, antigen, zinit, and others for the fish shell may have their own mechanisms for command resolution, and introspection but they are not directly comparable to bash builtins and may not provide the same level of detail.
 
 ## Bash Facts
 
