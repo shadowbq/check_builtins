@@ -6,6 +6,18 @@ A Bash utility to check whether commands are shell builtins, functions, aliases,
 
 This script helps system administrators and developers identify when shell builtins are being overridden by aliases, functions, or external commands. This is particularly important for security and reliability, as overriding critical commands like `cd`, `rm`, `mv`, `sudo`, etc., can lead to unexpected behavior or security vulnerabilities.
 
+## Features
+
+- **Sourcing Support**: Load the script in the current shell context
+- **Single Command Check**: Verify the shell `type` and status of a specific command
+- **Bulk Analysis**: Check all shell builtins for overrides
+- **Critical Commands Audit**: Special focus on security-critical commands
+- **Whitelist Support**: Configure exceptions for legitimate overrides
+- **JSON Export**: Export results in JSON format for automation
+- **Colorized Output**: Visual indicators for different command types
+- **Alias File Support**: Load additional alias definitions
+- **Debug Mode**: Detailed logging for troubleshooting
+
 ## Bash Facts
 
 This script cannot detect **aliases**, or **functions** from your current shell from direct execution because aliases and functions are not inherited by child processes. ***This is fundamental bash behavior***. You must source this script for live shell context checking. 
@@ -237,18 +249,34 @@ This will properly inherit all aliases from your current shell session and check
 - Use `cb_main()` only when the script is **sourced** (`source check_builtin.sh`)
 - All the helper functions will be available in the current shell context.
 - The execution flags also work as expected. `cb_main --all` will check all commands in the current shell context session.
+- All globals, and functions are namespaced with `cb_` prefix.
 
+### Sourcing Notes
 
-## Features
+List of available functions, and declared globals:
 
-- **Single Command Check**: Verify the shell `type` and status of a specific command
-- **Bulk Analysis**: Check all shell builtins for overrides
-- **Critical Commands Audit**: Special focus on security-critical commands
-- **Whitelist Support**: Configure exceptions for legitimate overrides
-- **JSON Export**: Export results in JSON format for automation
-- **Colorized Output**: Visual indicators for different command types
-- **Alias File Support**: Load additional alias definitions
-- **Debug Mode**: Detailed logging for troubleshooting
+```shell
+$ cb_ <tab>
+cb_check_command                       cb_inherit_parent_aliases              cb_main                                cb_show_help
+cb_colorize_status                     cb_initialize_builtins                 cb_parse_arguments                     cb_show_version
+cb_debug_log                           cb_initialize_critical_commands        cb_print_table_header                  cb_source_extra_alias_file
+cb_detect_missing_aliases_and_suggest  cb_initialize_variables                cb_print_table_row                     
+cb_export_current_aliases              cb_load_configuration                  cb_run_all_mode                        
+cb_find_config_file                    cb_load_exported_aliases               cb_run_single_command_mode 
+
+$ declare -p | grep cb_
+
+declare -- cb_all_mode="true"
+declare -- cb_debug="false"
+declare -- cb_extra_alias_file=""
+declare -- cb_inherit_aliases="false"
+declare -- cb_json_output=""
+declare -- cb_show_aliases="false"
+declare -- cb_show_functions="false"
+declare -- cb_single_command=""
+declare -- cb_strict="false"
+```
+
 
 ## Installation
 
