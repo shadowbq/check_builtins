@@ -178,8 +178,9 @@ ls                   ⚠      external command | external → /usr/bin/ls
 To detect aliases from your current shell, source the script first and then use the export function:
 
 ```bash
-source check_builtin.sh
-cb_main ls
+$ alias ls='ls --color=auto'
+$ source check_builtin.sh
+$ cb_main ls
 
 COMMAND              STATUS INFO
 -------              ------ ----
@@ -191,7 +192,7 @@ ls                   ❌     alias override | alias → LC_COLLATE=C ls --color=
 Notice that both `cd` and `ls` are detected as being overridden:
 
 ```bash
-cb_main -a
+$ cb_main -a
 COMMAND              STATUS INFO
 -------              ------ ----
 !                    ✔ keyword | keyword
