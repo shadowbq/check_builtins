@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # MIT License - Copyright (c) 2025 shadowbq
-set -euo pipefail
-shopt -s expand_aliases
+
 
 # ---------Constants---------
 VERSION="1.3.0"
@@ -132,11 +131,11 @@ cb_parse_arguments() {
             --debug) cb_debug=true ;;
             --json) shift; cb_json_output="$1" ;;
             -h|--help) cb_show_help; exit 0 ;;
-            --version) cb_show_version; exit 0 ;;
+            --version) cb_show_version;  exit 0 ;;
             *)
                 if [[ -n "$cb_single_command" ]]; then
                     builtin echo "Error: Multiple commands given: '$cb_single_command' and '$1'" >&2
-                    exit 1
+                     exit 1
                 fi
                 cb_single_command="$1"
                 ;;
@@ -548,11 +547,11 @@ cb_main() {
     cb_run_single_command_mode || cb_run_all_mode || {
         # If we get here, no valid arguments were provided
         cb_show_help
-        exit 2  # Standard exit code for improper usage
+         exit 2  # Standard exit code for improper usage
     }
     
     # Always exit 0 for successful execution (status numbers are reported in output)
-    exit 0
+    return 0
 }
 
 # -------- Export current aliases function (for sourced mode) --------
@@ -611,7 +610,7 @@ cb_export_current_aliases() {
     export CHECK_BUILTINS_ALIAS_FILE="$temp_alias_file"
     
     # Clean up function
-    trap 'rm -f "$temp_alias_file"' EXIT
+    #trap 'rm -f "$temp_alias_file"' EXIT
     
     # Execute the script with inherited aliases
     # Use BASH_SOURCE[0] to get the script path when sourced
@@ -623,5 +622,8 @@ cb_export_current_aliases() {
 
 # Only call cb_main if script is executed directly (not sourced)
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    set -euo pipefail
+    shopt -s expand_aliases
     cb_main "$@"
+    exit 0
 fi
