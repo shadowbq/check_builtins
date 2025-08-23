@@ -71,6 +71,28 @@ show_version
 check_command "ls"
 ```
 
+## Testing Alias Detection
+
+For testing specific alias scenarios, you can define test aliases in the same bash context:
+
+```bash
+# Method for testing with specific aliases
+bash -c 'alias ls="LC_COLLATE=C ls --color=auto"; source check_builtin.sh; export_current_aliases --debug ls'
+
+# Test multiple aliases
+bash -c '
+alias ls="ls --color=auto"
+alias grep="grep --color=auto" 
+alias ll="ls -la"
+source check_builtin.sh
+export_current_aliases ls
+export_current_aliases grep
+export_current_aliases ll
+'
+```
+
+This method is primarily for testing scenarios where you want to verify the script's behavior with specific alias definitions. For real-world usage with your actual shell aliases, use the standard method documented in the main README.
+
 ## Test Output & CI
 
 - Colorized output with ✓/✗ indicators and detailed failure information

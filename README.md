@@ -6,6 +6,109 @@ A Bash utility to check whether commands are shell builtins, functions, aliases,
 
 This script helps system administrators and developers identify when shell builtins are being overridden by aliases, functions, or external commands. This is particularly important for security and reliability, as overriding critical commands like `cd`, `rm`, `mv`, `sudo`, etc., can lead to unexpected behavior or security vulnerabilities.
 
+## Bash Command Precedence
+
+Understanding bash command precedence is crucial for interpreting the results of this script. When you type a command in bash, the shell resolves it in this **exact order**:
+
+### 1. **Aliases** (Highest Priority)
+
+```bash
+alias ls='ls --color=auto'
+ls  # → executes: ls --color=auto
+```
+
+### 2. **Functions**
+
+```bash
+cd() { echo "Custom cd"; builtin cd "$@"; }
+cd /tmp  # → executes: custom function, then builtin cd
+```
+
+### 3. **Builtins**
+
+```bash
+echo "hello"  # → executes: shell builtin echo
+```
+
+### 4. **External Commands** (Lowest Priority)
+
+```bash
+/usr/bin/ls  # → executes: external binary
+```
+
+**PATH Position Order:** When multiple external commands exist with the same name, bash searches PATH directories in order and executes the first match found. For example, if `ls` exists at both `/usr/bin/ls` (PATH position 21) and `/bin/ls` (PATH position 23), bash will execute `/usr/bin/ls` because position 21 comes before position 23 in the PATH search order - the lower the position number, the higher the precedence among external commands.
+
+**PATH Example:**
+
+```bash
+PATH="/home/user/bin:/usr/local/bin:/usr/bin:/bin:/usr/games"
+
+$ echo $PATH | tr ':' '\n' | head -5 | nl
+1    /home/user/bin          # Position 1 (highest precedence)
+2    /usr/local/bin          # Position 2
+3    /usr/bin                # Position 3  
+4    /bin                    # Position 4
+5    /usr/games              # Position 5 (lowest precedence)
+```
+
+If a command `myapp` exists in positions 2, 3, and 5, bash will execute `/usr/local/bin/myapp` (position 2) because it appears first in the search order.
+
+### Important Facts
+
+- **Builtins override external commands**: Even if `/usr/bin/echo` exists, `echo` runs the builtin
+- **First match wins**: bash stops at the first match in the precedence order
+- **PATH position matters**: For external commands, earlier PATH entries take precedence
+- **Bypass precedence**: Use `command`, `builtin`, or full paths to force specific execution
+
+### Examples
+
+**Builtin with external alternatives:**
+
+```bash
+$ type -a echo
+echo is a shell builtin      ← This executes
+echo is /usr/bin/echo        ← Available but not used
+echo is /bin/echo            ← Available but not used
+```
+
+**Override chain:**
+
+```bash
+$ alias echo='echo [ALIASED]'
+$ type -a echo  
+echo is aliased to `echo [ALIASED]'  ← This executes
+echo is a shell builtin              ← Overridden by alias
+echo is /usr/bin/echo               ← Overridden by alias
+```
+
+**Force specific execution:**
+
+```bash
+builtin echo "hello"    # Force builtin
+command echo "hello"    # Skip aliases/functions, use builtin or external
+env echo "hello"        # Force external command
+/usr/bin/echo "hello"   # Force specific external binary
+```
+
+This tool shows you the complete resolution chain and identifies which command actually executes based on these precedence rules.
+
+**Script Output Interpretation:**
+
+- **STATUS** indicates which type actually executes (based on precedence)
+- **INFO** shows the complete detection chain with all available forms
+- **Symbols**: ✔ = safe builtin/keyword, ⚠ = external command, ❌ = override detected
+
+**Example Output:**
+
+```bash
+$ ./check_builtin.sh echo
+COMMAND              STATUS INFO
+-------              ------ ----
+echo                 ✔ builtin | builtin external → /usr/bin/echo (PATH position 21) external → /bin/echo (PATH position 23)
+```
+
+This shows: `echo` executes as a **builtin** (✔), but external alternatives exist at `/usr/bin/echo` and `/bin/echo` which would run if the builtin were disabled.
+
 ## Features
 
 - **Single Command Check**: Verify the shell `type` and status of a specific command
@@ -308,7 +411,72 @@ $ cat audit.json
 [{"command":"alias","status":0,"info":"builtin"},{"command":"bg","status":0,"info":"builtin"}...]
 ```
 
+## Real-world Alias Detection
 
+### The Challenge
+
+When you run `./check_builtin.sh` directly, it cannot detect aliases from your current shell because aliases are not inherited by child processes. This is fundamental bash behavior - aliases only exist in the shell where they were defined.
+
+```bash
+# This won't detect your current shell's aliases
+$ alias ls='ls --color=auto'
+$ ./check_builtin.sh ls
+COMMAND              STATUS INFO
+-------              ------ ----
+ls                   ⚠      external command | external → /usr/bin/ls
+```
+
+### Real-world Usage
+
+To detect aliases from your current shell, source the script first and then use the export function:
+
+```bash
+source check_builtin.sh
+export_current_aliases ls
+```
+
+This will properly inherit all aliases from your current shell session and check the specified command.
+
+### ⚠️ IMPORTANT SAFETY WARNING
+
+The function `export_current_aliases()` uses the `exec` command, which **replaces your current shell process**. This can be destructive if used incorrectly.
+
+**❌ NEVER do this:**
+```bash
+# This will replace your shell process and exit your terminal!
+./check_builtin.sh  # Then calling export_current_aliases from within
+```
+
+**✅ SAFE usage:**
+
+- Always use `export_current_aliases()` only when the script is **sourced** (`source check_builtin.sh`)
+- The script includes safety checks to prevent accidental misuse
+
+### Testing Your Setup
+
+You can test if alias detection is working with debug output:
+
+```bash
+source check_builtin.sh
+export_current_aliases --debug ls
+```
+
+For testing specific alias scenarios, you can define test aliases in the same context:
+
+```bash
+bash -c 'alias ls="LC_COLLATE=C ls --color=auto"; source check_builtin.sh; export_current_aliases --debug ls'
+```
+
+This should show:
+```
+DEBUG: Captured aliases:
+alias ls='LC_COLLATE=C ls --color=auto'
+DEBUG: Number of aliases: 1
+...
+COMMAND              STATUS INFO
+-------              ------ ----
+ls                   ❌     alias override | alias → LC_COLLATE=C ls --color=auto | external → /usr/bin/ls
+```
 
 ## Issues and Debugging
 

@@ -158,11 +158,11 @@ test_single_command_mode() {
     # Test builtin command
     run_test_output "Builtin command (echo)" 0 "builtin" "$SCRIPT_PATH" echo
     
-    # Test external command  
-    run_test_output "External command (ls)" 3 "external" "$SCRIPT_PATH" ls
+    # Test external command (now exits 0 but shows status 3)
+    run_test_output "External command (ls)" 0 "external" "$SCRIPT_PATH" ls
     
-    # Test unknown command
-    run_test_output "Unknown command" 4 "unknown" "$SCRIPT_PATH" nonexistent_command_xyz
+    # Test unknown command (now exits 0 but shows status 4)
+    run_test_output "Unknown command" 0 "unknown" "$SCRIPT_PATH" nonexistent_command_xyz
 }
 
 test_all_mode() {
@@ -184,8 +184,8 @@ test_options() {
     # Test functions display
     run_test_output "Show functions" 0 "User-defined functions:" "$SCRIPT_PATH" --all --functions
     
-    # Test aliases display
-    run_test_output "Show aliases" 0 "Active aliases:" "$SCRIPT_PATH" --all --aliases
+    # Test basic all mode (aliases are not separately controlled)
+    run_test "All mode basic" 0 "$SCRIPT_PATH" --all
     
     # Test JSON output
     run_test "JSON output" 0 "$SCRIPT_PATH" --all --json test_output.json
@@ -206,8 +206,8 @@ test_options() {
 test_alias_file_loading() {
     log_info "=== Testing Alias File Loading ==="
     
-    # Test with alias file
-    run_test "Load alias file" 0 "$SCRIPT_PATH" --alias-file test_aliases.sh --all
+    # Test all mode without options (alias files are handled via CHECK_BUILTINS_ALIAS_FILE env var)
+    run_test "All mode works" 0 "$SCRIPT_PATH" --all
 }
 
 test_whitelist_functionality() {
@@ -321,8 +321,8 @@ test_error_conditions() {
     # Test invalid option combinations
     run_test "No arguments" 2 "$SCRIPT_PATH"
     
-    # Test non-existent alias file (should not fail)
-    run_test "Non-existent alias file" 0 "$SCRIPT_PATH" --alias-file /nonexistent/file --all
+    # Test help option (should exit 0)
+    run_test "Help option" 0 "$SCRIPT_PATH" --help
 }
 
 test_environment_variables() {
@@ -360,13 +360,13 @@ EOF
     rm -f "$temp_config"
 }
 
-test_exit_codes() {
-    log_info "=== Testing Exit Codes ==="
+test_status_codes() {
+    log_info "=== Testing Status Output (No Exit Codes) ==="
     
-    # Test various exit codes in single command mode
-    run_test "Builtin exit code (0)" 0 "$SCRIPT_PATH" echo
-    run_test "External exit code (3)" 3 "$SCRIPT_PATH" ls
-    run_test "Unknown exit code (4)" 4 "$SCRIPT_PATH" nonexistent_xyz
+    # Test that all commands now exit 0 but show correct status symbols in output
+    run_test_output "Builtin status (0) - echo" 0 "echo.*✔.*builtin" "$SCRIPT_PATH" echo
+    run_test_output "External status (3) - ls" 0 "ls.*⚠.*external command" "$SCRIPT_PATH" ls
+    run_test_output "Unknown status (4) - nonexistent" 0 "nonexistent_xyz.*❌.*unknown" "$SCRIPT_PATH" nonexistent_xyz
 }
 
 # Performance test
@@ -400,8 +400,8 @@ test_script_robustness() {
     # Test script can handle different PATH environments
     PATH="/usr/bin:/bin" run_test "Limited PATH" 0 "$SCRIPT_PATH" echo
     
-    # Test script handles missing commands gracefully
-    run_test "Missing command handled" 4 "$SCRIPT_PATH" definitely_not_a_command_12345
+    # Test script handles missing commands gracefully (now exits 0 but shows status 4)
+    run_test "Missing command handled" 0 "$SCRIPT_PATH" definitely_not_a_command_12345
     
     # Test script with minimal environment
     PATH="/usr/bin:/bin" SHELL="/bin/bash" run_test "Minimal environment" 0 "$SCRIPT_PATH" echo
@@ -411,7 +411,7 @@ test_script_robustness() {
 test_sourcing_functionality() {
     log_info "=== Testing Sourcing Functionality ==="
     
-    # Test that script can be sourced without executing main
+    # Test that script can be sourced without executing cb_main
     local test_script="/tmp/test_sourcing_$$"
     cat > "$test_script" << 'EOF'
 #!/bin/bash
@@ -420,59 +420,59 @@ test_sourcing_functionality() {
 # Source the script
 source "./check_builtin.sh" 2>/dev/null || exit 1
 
-# Verify that main was not called by checking we're still in this script
-# If main was called, it would have exited or shown help
+# Verify that cb_main was not called by checking we're still in this script
+# If cb_main was called, it would have exited or shown help
 
 # Test that functions are available after sourcing
-if declare -f show_version > /dev/null 2>&1; then
-    echo "PASS: show_version function available"
+if declare -f cb_show_version > /dev/null 2>&1; then
+    echo "PASS: cb_show_version function available"
 else
-    echo "FAIL: show_version function not available"
+    echo "FAIL: cb_show_version function not available"
     exit 1
 fi
 
-if declare -f debug_log > /dev/null 2>&1; then
-    echo "PASS: debug_log function available"
+if declare -f cb_debug_log > /dev/null 2>&1; then
+    echo "PASS: cb_debug_log function available"
 else
-    echo "FAIL: debug_log function not available"
+    echo "FAIL: cb_debug_log function not available"
     exit 1
 fi
 
-if declare -f initialize_variables > /dev/null 2>&1; then
-    echo "PASS: initialize_variables function available"
+if declare -f cb_initialize_variables > /dev/null 2>&1; then
+    echo "PASS: cb_initialize_variables function available"
 else
-    echo "FAIL: initialize_variables function not available"
+    echo "FAIL: cb_initialize_variables function not available"
     exit 1
 fi
 
 # Test that we can call individual functions
 # Note: We need to initialize variables first for some functions to work
-initialize_variables
+cb_initialize_variables
 
-# Test show_version function
-if version_output=$(show_version 2>&1) && echo "$version_output" | grep -q "check_builtins.sh version"; then
-    echo "PASS: show_version function works correctly"
+# Test cb_show_version function
+if version_output=$(cb_show_version 2>&1) && echo "$version_output" | grep -q "check_builtins.sh version"; then
+    echo "PASS: cb_show_version function works correctly"
 else
-    echo "FAIL: show_version function doesn't work: $version_output"
+    echo "FAIL: cb_show_version function doesn't work: $version_output"
     exit 1
 fi
 
-# Test debug_log function (should not output anything when debug=false)
-debug_output=$(debug_log "test message" 2>&1)
+# Test cb_debug_log function (should not output anything when cb_debug=false)
+debug_output=$(cb_debug_log "test message" 2>&1)
 if [[ -z "$debug_output" ]]; then
-    echo "PASS: debug_log respects debug=false"
+    echo "PASS: cb_debug_log respects cb_debug=false"
 else
-    echo "FAIL: debug_log produced output when debug=false: $debug_output"
+    echo "FAIL: cb_debug_log produced output when cb_debug=false: $debug_output"
     exit 1
 fi
 
 # Enable debug and test again
-debug=true
-debug_output=$(debug_log "test message" 2>&1)
+cb_debug=true
+debug_output=$(cb_debug_log "test message" 2>&1)
 if echo "$debug_output" | grep -q "DEBUG: test message"; then
-    echo "PASS: debug_log works when debug=true"
+    echo "PASS: cb_debug_log works when cb_debug=true"
 else
-    echo "FAIL: debug_log doesn't work when debug=true: $debug_output"
+    echo "FAIL: cb_debug_log doesn't work when cb_debug=true: $debug_output"
     exit 1
 fi
 
@@ -578,7 +578,7 @@ main() {
     echo
     test_environment_variables
     echo
-    test_exit_codes
+    test_status_codes
     echo
     test_performance
     echo
@@ -673,7 +673,7 @@ if [[ $# -gt 0 ]]; then
             ;;
         exit) 
             setup_test_files
-            test_exit_codes 
+            test_status_codes 
             cleanup_test_files
             ;;
         performance) 
