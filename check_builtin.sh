@@ -609,14 +609,11 @@ cb_export_current_aliases() {
     # Export the temp file path so the child process can find it
     export CHECK_BUILTINS_ALIAS_FILE="$temp_alias_file"
     
-    # Clean up function
-    #trap 'rm -f "$temp_alias_file"' EXIT
-    
-    # Execute the script with inherited aliases
-    # Use BASH_SOURCE[0] to get the script path when sourced
-    #local script_path="${BASH_SOURCE[0]}"
-    #exec "$script_path" "$@"
+    # Run main with loaded aliases
     cb_main "$@"
+    
+    # Clean up function
+    rm -f "$temp_alias_file"
 }
 
 
